@@ -1,0 +1,94 @@
+IF EXISTS ( SELECT 1 FROM sys.tables WHERE name = 'Categories' )
+BEGIN
+  drop table filmcategories;
+  drop table reviews;
+  drop table members;
+  drop table films;
+  drop table categories;
+END
+go
+
+Create table Categories (
+Categoryid        integer identity(1,1) primary key,
+CategoryName      varchar(20) not null
+);
+
+Create table Films (
+FilmID            integer identity(1,1) primary key,
+Title             varchar(100) not null,
+Link              varchar(100) not null,
+YearMade          int not null,
+Imagefile         varchar(30) not null,
+Synopsis          nvarchar(1500) not null,
+Resources         nvarchar(1000) not null
+);
+
+Create table Members (
+MemberID          integer identity(1,1) primary key,
+Email             varchar(50) not null,
+PWD               nvarchar(50) not null,
+MemberName        varchar(30) not null,
+Avatar            varchar(30) not null,
+Admin             integer not null
+);
+
+Create table Reviews (
+MemberID          integer references Members(MemberID),
+FilmID            integer references Films(FilmID),
+ReviewDate        DATETIME NOT NULL DEFAULT GETDATE(),
+Rating            int not null check(Rating between 1 and 5),
+ReviewTitle       nvarchar(100) not null,
+FullReview        nvarchar(1000) not null,
+primary key(MemberID, FilmID)
+);
+
+Create table FilmCategories (
+FilmID            integer not null references Films(FilmID),
+CategoryID        integer not null references Categories(CategoryID),
+primary key(FilmID, CategoryID)
+);
+
+go
+IF EXISTS ( SELECT 1 FROM sys.views WHERE name = 'FilmReviews' )
+BEGIN
+  drop view FilmReviews;
+END
+go
+Create view FilmReviews as
+SELECT Films.FilmId, Avatar, 
+    ReviewDate, Rating, ReviewTitle, 
+    FullReview, MemberName
+FROM Members,Films,Reviews 
+Where Films.FilmId = Reviews.FilmID
+  and Members.MemberID = Reviews.MemberID;
+go
+IF EXISTS ( SELECT 1 FROM sys.views WHERE name = 'FilmListView1' )
+BEGIN
+  drop view FilmListView1;
+END
+go
+create view FilmListView1 as
+select films.filmid,films.Title,films.Synopsis,
+       films.Imagefile,
+       FilmCategories.CategoryID
+From films,FilmCategories
+Where films.FilmID = FilmCategories.filmid
+go
+IF EXISTS ( SELECT 1 FROM sys.views WHERE name = 'CheckModelView1' )
+BEGIN
+   drop view CheckModelView1;
+END
+go
+create view CheckModelView1 as
+SELECT FilmCategories.filmid, Categories.Categoryid, CategoryName, 
+     1 as Checked
+FROM Categories,FilmCategories
+WHERE Categories.Categoryid = FilmCategories.Categoryid
+union all
+SELECT filmid, Categoryid, CategoryName, 0 as Checked
+FROM Categories,Films
+WHERE  not exists (
+       select 1 from filmCategories 
+       where films.filmid = FilmCategories.filmid 
+	 and categories.Categoryid = FilmCategories.Categoryid);
+--select * from checkmodelview1 where filmid = 4 order by 2
